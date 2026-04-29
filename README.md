@@ -1,32 +1,67 @@
-# Consumption Framework tools
+# Ferramentas do Consumption Framework
 
-This repository contains various tools aiming to help Elasticsearch users better understand the consumption patterns of their deployments. They don't aim to be purely used in cost reduction / optimization efforts, but rather to help users understand resource allocation, and how to better plan for growth.
+Este repositório contém diversas ferramentas que auxiliam usuários do Elasticsearch a entenderem melhor os padrões de consumo de seus deployments. O objetivo não é apenas reduzir custos / otimizar despesas, mas também ajudar os usuários a compreender a alocação de recursos e a planejar melhor o crescimento.
 
-Namely, thanks to the data these tool can gather, and the Kibana dashboards through which they can be visualized, users can:
+Graças aos dados que essas ferramentas conseguem coletar e aos dashboards do Kibana através dos quais eles podem ser visualizados, os usuários podem:
 
-- Understand ingest patterns and cost allocation for their entire organization.
-- Explore billing data in ways that are not offered out-of-the-box by Elastic Cloud interface.
-- Understand how much data is being indexed, and how storage is being used.
+- Entender padrões de ingestão e alocação de custos para toda a sua organização.
+- Explorar dados de billing de formas que não são oferecidas nativamente pela interface do Elastic Cloud.
+- Compreender quanto dado está sendo indexado e como o armazenamento está sendo utilizado.
 
-## Screenshots
+## Capturas de tela
 
 <details>
 
-<summary>Click to expand</summary>
+<summary>Clique para expandir</summary>
 
-![Organization overview](./images/organization_overview.png)
+![Visão geral da organização](./images/organization_overview.png)
 
-![Deployment dashboard](./images/deployment_dashboard.png)
+![Dashboard de deployment](./images/deployment_dashboard.png)
 
-![Datastream analysis](./images/datastream_analysis.png)
+![Análise de datastream](./images/datastream_analysis.png)
 
-![Tier analysis](./images/tier_analysis.png)
+![Análise de tier](./images/tier_analysis.png)
 
 </details>
 
-## How to use?
+## Requisitos
 
-The `main.py` script exposes multiple commands:
+- **Elastic** em produção `> 8.0` ou `9.x` (o framework agora suporta ambas as versões)
+- **Python** `>= 3.10`
+- **Docker** (opcional, para execução containerizada)
+- Código-fonte de referência: <https://github.com/krol3/consumption>
+
+### Compatibilidade de versões do Elasticsearch
+
+O cliente `elasticsearch-py` precisa estar alinhado com a versão do servidor:
+
+| Versão do cluster Elastic | Linha a manter no `requirements.txt`        |
+| ------------------------- | ------------------------------------------- |
+| 8.x                       | `elasticsearch>=8.3.3,<9`                   |
+| 9.x                       | `elasticsearch>=9.0.0,<10` (padrão atual)   |
+
+Por padrão, o `requirements.txt` deste projeto vem configurado para **Elastic 9.x**. Se o seu cluster ainda estiver na versão 8.x, troque a linha do pacote `elasticsearch` antes de instalar as dependências.
+
+### Instalando o Python no CentOS / RHEL
+
+```bash
+sudo yum update -y
+sudo yum install -y gcc openssl-devel bzip2-devel libffi-devel
+```
+
+Download e build do Python a partir do código-fonte:
+
+```bash
+cd /usr/src
+sudo wget https://www.python.org/ftp/python/3.10.0/Python-3.10.0.tgz
+sudo tar xzf Python-3.10.0.tgz
+```
+
+> Em distribuições mais recentes do Ubuntu/Debian, basta usar `apt install python3.10 python3.10-venv`.
+
+## Como usar
+
+O script `main.py` expõe múltiplos comandos:
 
 ```bash
 Usage: main.py [OPTIONS] COMMAND [ARGS]...
@@ -35,21 +70,21 @@ Options:
   --help  Show this message and exit.
 
 Commands:
-  consume-monitoring  Consume monitoring data from an existing cluster
-  get-billing-data    Recover org-level billing data from ESS
-  init                Initialize the target cluster
+  consume-monitoring  Consome dados de monitoramento de um cluster existente
+  get-billing-data    Recupera dados de billing em nível de organização do ESS
+  init                Inicializa o cluster de destino
 ```
 
-- `init` will create the index templates, ILM policy and ingest pipelines required for the other commands to work.
-- `get-billing-data` will recover the billing data from ESS, and index it into the target cluster. This will populate the organization overview dashboard.
-- `consume-monitoring` will consume monitoring data from an existing cluster, and index it into the target cluster. This will populate all further dashboards and give you the most granularity about your data and its usage.
+- `init` — cria os index templates, política de ILM e ingest pipelines necessários para o funcionamento dos demais comandos.
+- `get-billing-data` — recupera os dados de billing do ESS e indexa no cluster de destino. Isso popula o dashboard "Organization overview".
+- `consume-monitoring` — consome os dados de monitoramento de um cluster existente e indexa no cluster de destino. Isso popula todos os demais dashboards e fornece a maior granularidade sobre os dados e seu uso.
 
-## How does it work?
+## Como funciona
 
-The ingestion is made as following :
+A ingestão acontece da seguinte forma:
 
-1. ESS clusters are sending their metrics to a centralized [monitoring instance](https://www.elastic.co/guide/en/cloud/current/ec-enable-logging-and-monitoring.html)
-2. The script consume native _.monitoring*_ index and send to a visualization cluster.
+1. Os clusters ESS enviam suas métricas para uma [instância centralizada de monitoramento](https://www.elastic.co/guide/en/cloud/current/ec-enable-logging-and-monitoring.html).
+2. O script consome os índices nativos `.monitoring*` e envia para um cluster de visualização.
 
 ```mermaid
   graph TD;
@@ -69,103 +104,106 @@ The ingestion is made as following :
       visualization-cluster<-->Kibana
 ```
 
-More information about the execution model can be found in [this deck](https://docs.google.com/presentation/d/1aJutCxUlVtnDaTwz-QwcaWMex133edXl-CmV-KeOXPU/edit#slide=id.g2ac43bd4279_0_0) (Elasticians-only link).
+Mais informações sobre o modelo de execução podem ser encontradas [neste deck](https://docs.google.com/presentation/d/1aJutCxUlVtnDaTwz-QwcaWMex133edXl-CmV-KeOXPU/edit#slide=id.g2ac43bd4279_0_0) (link interno da Elastic).
 
-### Billing data
+### Dados de billing
 
-The script hits the [billing APIs of ESS](https://www.elastic.co/guide/en/cloud/current/Billing_Costs_Analysis.html) and saves the results to your target cluster, in a format that can then be easily consumed through Kibana dashboards. Since the data is saved on Elastic side, you can go back as far as you'd like in time, and the script will only fetch the data that is not already present in the target cluster.
+O script consulta as [APIs de billing do ESS](https://www.elastic.co/guide/en/cloud/current/Billing_Costs_Analysis.html) e salva os resultados no cluster de destino, em um formato facilmente consumível pelos dashboards do Kibana. Como os dados ficam armazenados do lado do Elastic, é possível voltar tão longe quanto se queira no tempo, e o script só busca os dados que ainda não estão presentes no cluster de destino.
 
-### Monitoring data
+### Dados de monitoramento
 
-The based principle of this command is to piggyback on existing monitoring data, collected by built-in monitoring collectors. The main challenges are:
+O princípio base desse comando é aproveitar os dados de monitoramento já coletados pelos coletores nativos. Os principais desafios são:
 
-1. The data is collected on the index level, and therefore needs to be tied in to business-level information such as the data tier or the datastream.
-2. The counters on which the data is based are reset upon shard movement, it is therefore necessary to compare data points with one another in order to understand the evolution of the metrics, rather than the instantaneous value of the counter.
+1. Os dados são coletados em nível de índice, e portanto precisam ser correlacionados com informações de negócio como tier ou datastream.
+2. Os contadores nos quais os dados se baseiam são reiniciados quando há movimentação de shards. É necessário, portanto, comparar pontos de dados entre si para entender a evolução das métricas, em vez de olhar o valor instantâneo do contador.
 
-To tackle these challenges, the script will not strictly look at a point in time, but rather the evolution of monitoring data across 10-minutes chunks, and enrich the index-level information with context coming from the nodes where the indices are hosted. Since the shard of an index can move at any point during these 10 minutes chunk, it is important to note that the results should be considered as approximations.
+Para enfrentar esses desafios, o script não olha estritamente para um ponto no tempo, mas sim para a evolução dos dados de monitoramento em janelas de 10 minutos, enriquecendo as informações em nível de índice com o contexto dos nós onde os índices estão hospedados. Como o shard de um índice pode se mover a qualquer momento dentro dessa janela de 10 minutos, é importante ressaltar que os resultados devem ser considerados aproximações.
 
-Once index-level data is properly contextualized, it is then aggregated at the datastream + tier level and billing information is ventilated to the datastreams according to their fractional usage of the tier. 3 dimensions are used to ventilate the billing information:
+Uma vez que os dados em nível de índice estão devidamente contextualizados, eles são agregados em nível de datastream + tier, e a informação de billing é distribuída entre os datastreams de acordo com seu uso fracional do tier. Três dimensões são usadas para distribuir a informação de billing:
 
-- Storage size. A datastream that uses 10% of the storage of a tier will be allocated 10% of total cost of the tier.
-- Query time. A datastream that uses 10% of the query time of a tier will be allocated 10% of total cost of the tier.
-- Indexing time. A datastream that uses 10% of the indexing time of a tier will be allocated 10% of total cost of the tier.
+- **Tamanho de armazenamento.** Um datastream que utiliza 10% do storage de um tier receberá a alocação de 10% do custo total daquele tier.
+- **Tempo de query.** Um datastream que utiliza 10% do tempo de query de um tier receberá a alocação de 10% do custo total daquele tier.
+- **Tempo de indexação.** Um datastream que utiliza 10% do tempo de indexação de um tier receberá a alocação de 10% do custo total daquele tier.
 
-Even though each individual dimension alone doesn't accurately represent the full business usage of a datastream, the combination of the 3 dimensions and most importantly the discrepancies among them can help users understand the usage of their data.
+Embora cada dimensão isolada não represente com precisão o uso completo de negócio de um datastream, a combinação das três dimensões — e principalmente as discrepâncias entre elas — ajuda os usuários a compreender o uso de seus dados.
 
 ## FAQ
 
-Please see [this document](https://docs.google.com/document/d/1QlAValDdp8B0oFABdeSemeBH3ukPj7agulg68AhXfUM/edit#heading=h.3v16o5fpcokw) (Elasticians-only link) for FAQ.
+Consulte [este documento](https://docs.google.com/document/d/1QlAValDdp8B0oFABdeSemeBH3ukPj7agulg68AhXfUM/edit#heading=h.3v16o5fpcokw) (link interno da Elastic) para o FAQ.
 
-## Configuration file
+## Configuração — Passo a passo
 
-The configuration file is a YAML file that contains the following information
+### Passo 1 — Criar o arquivo de configuração
+
+Copie o arquivo de exemplo e preencha com seus valores:
+
+```bash
+cp config.yml.sample config.yml
+```
+
+Configuração mínima (Elastic Cloud / ESS):
 
 ```yaml
----
-# The name of your organization, this will be populated on every single resulting document
-organization_name: "Change me"
+organization_name: "My Org"
+organization_id: "12345"          # de cloud.elastic.co → Account → Organization ID
+billing_api_key: "essu_XXXX"      # requer permissões de billing-admin
 
-# The organization ID from Elastic Cloud, for ESS deployments.
-# You can comment this out for on-premises deployments
-organization_id: "12345"
-
-# The billing API key for your organization
-# You can comment this out for on-premises deployments
-billing_api_key: "essu_XXXX"
-
-# Where we'll read the monitoring data from
 monitoring_source:
-  hosts: 'https://where-i-want-to-get-the-data:443'
-  api_key: 'ZZZZZZZZZZZ'
+  cloud_id: 'deployment-name:BASE64STRING'
+  api_key: 'SOURCE_API_KEY'
   retry_on_timeout: true
   request_timeout: 60
 
-# Where the consumption data (result of the script's run) will be sent
-# This can be the same cluster as the source.
 consumption_destination:
-  hosts: 'https://where-i-want-the-data-to-be-indexed:443'
-  api_key: 'YYYYYYYYYYY'
-
-# For on-premises deployment, you'll need to specify the costs of your tier per 1 GB RAM per hour
-# on_prem_costs:
-#   hot: 1.0
-#   warm: 0.5
-#   cold: 0.25
-#   frozen: 0.1
-
-# Uncomment and modify this if you want to read indices other than the default monitoring ones
-# (for example using cross-cluster search)
-# monitoring_index_pattern: '.monitoring-es-8*'
-
-# Uncomment and modify this for Federal customers using a non-standard ESS endpoint
-# api_host: 'api.elastic-cloud.com'
+  cloud_id: 'deployment-name:BASE64STRING'
+  api_key: 'DESTINATION_API_KEY'
 ```
 
-* `organization_id` is the ID of your Elastic Cloud organization. This needs to match what is reported in ESS.
-* `organization_name` is the name of your Elastic Cloud organization. You can name it as you wish, it can be useful to aggregate multiple organization\_ids under the same name.
-* `billing_api_key` is the API key that will be used to fetch billing data from ESS. This key will require billing admin permissions, and needs to be generated for the target `organization_id`.
-* `monitoring_source` and `consumption_destination` (formerly `source` and `monitoring`) describe parameters natively passed to an [`Elasticsearch` client](https://elasticsearch-py.readthedocs.io/en/latest/api/elasticsearch.html). The `monitoring_source` section is used to fetch monitoring data from the source cluster, and the `consumption_destination` section is used to index the data into the target cluster. These can be identical, provided that the credentials have the proper permissions.
-* `on_prem_costs` is a mapping of the cost per GB of RAM per hour for each tier. This is used to compute the cost of on-prem clusters.
-* `monitoring_index_pattern` is the pattern used to fetch monitoring data. This is useful if you are using a custom pattern for your monitoring indices, or want to use CCS to query monitoring data across multiple clusters. The default value is `.monitoring-es-8*`.
-* `api_host` is the host of the ESS API. This is used to fetch billing data. The default value is `api.elastic-cloud.com`.
+### Passo 2 — Onde encontrar os identificadores
 
-`organization_id`/`billing_api_key` and `on_prem_costs` are mutually exclusive.
+- **Organization ID / IDs de usuários:** <https://cloud.elastic.co/account/members>
+- **Billing API key:** <https://cloud.elastic.co/account/keys>
 
-It is also possible to pass the configuration inline, using the `--config-inline` parameter. In that case, you should pass the configuration as a JSON string. You can also override individual parameters using the `--config KEY=VALUE` parameter (multiple times if needed).
+### Passo 3 — Provisionar as API keys
 
-## HOW-TO
+#### API KEY — `consumption_destination`
 
-Check [this document](https://docs.google.com/document/d/1kyaO9CELxmrttmmIFQWWxLlgahOEaZU7PXG5jOz9b8g/edit) (Elasticians-only link, but ok to share a pdf externally) for a description of the deployment of the tool.
+Esta API key é usada para escrever no cluster de destino (consumption). Ela também precisa de permissões para gerenciar templates, ILM e pipelines de ingestão (necessárias para o comando `init`):
 
-## Permissions
-
-In the `monitoring_source` cluster, the script will be reading the `.monitoring-es-8*` indices. The user (or API key) used to connect to the cluster will therefore need to have the corresponding `read` permission. The below API call can be used to provision the required API key on the `monitoring_source` cluster:
-
-<details>
-
-<summary>Dev tools API call to create the source API key</summary>
-
+```json
+POST /_security/api_key
+{
+  "name": "consumption_framework_destination",
+  "role_descriptors": {
+    "consumption_framework": {
+      "indices": [
+        {
+          "names": [
+            "consumption*"
+          ],
+          "privileges": [
+            "read",
+            "view_index_metadata",
+            "index",
+            "auto_configure"
+          ]
+        }
+      ],
+      "cluster": [
+        "manage_ingest_pipelines",
+        "manage_ilm",
+        "manage_index_templates"
+      ]
+    }
+  }
+}
 ```
+
+#### API KEY — `monitoring_source`
+
+No cluster `monitoring_source`, o script lê os índices `.monitoring-es-8*` (ou `.monitoring-es-9*` no Elastic 9). O usuário (ou API key) usado para conectar ao cluster precisa, portanto, ter a permissão `read` correspondente. A chamada abaixo provisiona a API key necessária no cluster `monitoring_source`:
+
+```json
 POST /_security/api_key
 {
   "name": "consumption_framework_source",
@@ -186,41 +224,191 @@ POST /_security/api_key
 }
 ```
 
-</details>
+> Para clusters Elastic 9.x, ajuste o pattern para `.monitoring-es-9*` (ou use `.monitoring-es-*` para abranger ambas as versões).
 
-In the `consumption_destination` cluster, the script will be writing to `consumption-[DATE]` indices. Again, the user needs to have the corresponding `index` and `auto_configure` permissions.
-The additional `read` permission on the index is necessary for backlog checks, preventing the script from re-computing already existing data (see the command help for more information).
+### Passo 4 — Importar os dashboards no Kibana
 
-<details>
+Na pasta `kibana_exports` do repositório existem arquivos `.ndjson` para o Kibana — são saved objects prontos para upload.
 
-<summary>Dev tools API call to create the destination API key</summary>
+No Kibana, vá em **Stack Management → Saved Objects** e clique em **Import** (canto superior direito, a partir da versão 8.12.1). Em seguida, selecione **Import** novamente, escolha o arquivo `.ndjson` (por exemplo, `8.13.1.ndjson`) do seu sistema de arquivos local e clique em **Done** para fechar o painel.
 
-```
-POST /_security/api_key
-{
-  "name": "consumption_framework_destination",
-  "role_descriptors": {
-    "consumption_framework": {
-      "indices": [
-        {
-          "names": [
-            "consumption*"
-          ],
-          "privileges": [
-            "read",
-            "view_index_metadata",
-            "index",
-            "auto_configure"
-          ]
-        }
-      ]
-    }
-  }
-}
+## Executando
+
+### Usando Python (ambiente virtual)
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip3 install -r requirements.txt
 ```
 
-</details>
+> Para remover o ambiente: `deactivate` e em seguida `rm -r ./venv`.
 
-Finally, if you want to use the `init` command, you will need to add the `manage_ingest_pipelines`, `manage_ilm` and `manage_index_templates` cluster privileges.
-You could also manually upload the ingest pipeline, ILM policy and index template from the [`consumption/_meta`](consumption/_meta) directory to your `consumption_destination` cluster.
+Em seguida, importe os dados iniciais de billing do Elasticsearch Service / Elastic Cloud. O comando `get-billing-data` recupera os dados do ESS e indexa no cluster de destino, populando o dashboard de visão geral da organização:
 
+```bash
+python3 main.py get-billing-data --config-file config.yml --lookbehind=24 --force --debug
+```
+
+Por fim, faça a primeira coleta dos dados de uso do cluster a partir do Monitoring Cluster:
+
+```bash
+python3 main.py consume-monitoring --config-file config.yml --lookbehind=24 --force --debug
+```
+
+### Usando Docker
+
+Build e teste rápido da imagem:
+
+```bash
+docker build -t elastic_consumption_framework:local .
+
+docker run --rm elastic_consumption_framework:local --help
+```
+
+Coleta de billing:
+
+```bash
+docker run --rm \
+  -v $(pwd)/config.yml:/app/config.yml \
+  elastic_consumption_framework:local \
+  get-billing-data --config-file /app/config.yml --lookbehind 24 --force --debug
+```
+
+Inicialização do cluster de destino:
+
+```bash
+docker run --rm \
+  -v $(pwd)/config.yml:/app/config.yml \
+  elastic_consumption_framework:local \
+  init --config-file /app/config.yml --lookbehind 24 --force --debug
+```
+
+Conferir o `config.yml` montado dentro do container:
+
+```bash
+docker run --rm -v $(pwd)/config.yml:/app/config.yml elastic_consumption_framework:local -- cat /app/config.yml
+```
+
+## Arquivo de configuração
+
+O arquivo de configuração é um YAML que contém as informações abaixo:
+
+```yaml
+---
+# Nome da sua organização — esse valor será populado em todos os documentos resultantes
+organization_name: "Change me"
+
+# ID da organização no Elastic Cloud (deployments ESS).
+# Comente esta linha para deployments on-premises.
+organization_id: "12345"
+
+# API key de billing da sua organização.
+# Comente esta linha para deployments on-premises.
+billing_api_key: "essu_XXXX"
+
+# De onde os dados de monitoramento serão lidos
+monitoring_source:
+  hosts: 'https://where-i-want-to-get-the-data:443'
+  api_key: 'ZZZZZZZZZZZ'
+  retry_on_timeout: true
+  request_timeout: 60
+
+# Para onde os dados de consumo (resultado da execução do script) serão enviados.
+# Pode ser o mesmo cluster do monitoring_source.
+consumption_destination:
+  hosts: 'https://where-i-want-the-data-to-be-indexed:443'
+  api_key: 'YYYYYYYYYYY'
+
+# Para deployments on-premises, especifique os custos do tier por 1 GB de RAM por hora
+# on_prem_costs:
+#   hot: 1.0
+#   warm: 0.5
+#   cold: 0.25
+#   frozen: 0.1
+
+# Descomente e ajuste para ler índices diferentes do padrão (por exemplo via cross-cluster search)
+# monitoring_index_pattern: '.monitoring-es-8*'
+
+# Descomente e ajuste para clientes Federal usando endpoint não padrão do ESS
+# api_host: 'api.elastic-cloud.com'
+```
+
+- `organization_id` — ID da sua organização no Elastic Cloud. Precisa coincidir com o reportado no ESS.
+- `organization_name` — nome da organização. Pode ser nomeado livremente; útil para agregar múltiplos `organization_id` sob um mesmo nome.
+- `billing_api_key` — API key usada para buscar dados de billing no ESS. Requer permissão de billing admin e precisa ser gerada para o `organization_id` correspondente.
+- `monitoring_source` e `consumption_destination` (anteriormente `source` e `monitoring`) descrevem os parâmetros nativamente passados a um [cliente `Elasticsearch`](https://elasticsearch-py.readthedocs.io/en/latest/api/elasticsearch.html). A seção `monitoring_source` é usada para ler os dados de monitoramento; a `consumption_destination` é usada para indexar os dados no cluster de destino. Os dois podem apontar para o mesmo cluster, desde que as credenciais tenham permissões adequadas.
+- `on_prem_costs` — mapeamento do custo por GB de RAM por hora para cada tier. Usado para calcular o custo de clusters on-prem.
+- `monitoring_index_pattern` — pattern usado para buscar dados de monitoramento. Útil quando se usa um pattern customizado ou CCS para consultar dados de monitoramento de múltiplos clusters. O valor padrão é `.monitoring-es-8*` (ajuste para `.monitoring-es-9*` ou `.monitoring-es-*` conforme seu ambiente).
+- `api_host` — host da API do ESS, usado para buscar dados de billing. Valor padrão: `api.elastic-cloud.com`.
+
+`organization_id` / `billing_api_key` e `on_prem_costs` são mutuamente exclusivos.
+
+Também é possível passar a configuração inline, com o parâmetro `--config-inline` recebendo um JSON. Parâmetros individuais podem ser sobrescritos via `--config KEY=VALUE` (várias vezes, se necessário).
+
+## HOW-TO
+
+Consulte [este documento](https://docs.google.com/document/d/1kyaO9CELxmrttmmIFQWWxLlgahOEaZU7PXG5jOz9b8g/edit) (link interno da Elastic, mas é permitido compartilhar um PDF externamente) para uma descrição completa do deployment da ferramenta.
+
+## Permissões
+
+No cluster `monitoring_source`, o script lê os índices `.monitoring-es-8*` (ou `.monitoring-es-9*` no Elastic 9). O usuário (ou API key) precisa ter a permissão `read` correspondente. Use a chamada de API descrita no [Passo 3 — `monitoring_source`](#api-key--monitoring_source).
+
+No cluster `consumption_destination`, o script escreve nos índices `consumption-[DATA]`. O usuário precisa das permissões `index` e `auto_configure`. A permissão adicional de `read` no índice é necessária para checagens de backlog, evitando que o script recompute dados já existentes (consulte a ajuda do comando para mais detalhes). Use a chamada descrita no [Passo 3 — `consumption_destination`](#api-key--consumption_destination).
+
+Por fim, se você for usar o comando `init`, será necessário adicionar os privilégios de cluster `manage_ingest_pipelines`, `manage_ilm` e `manage_index_templates`.
+Alternativamente, é possível subir manualmente o ingest pipeline, política de ILM e index template do diretório [`consumption/_meta`](consumption/_meta) para o cluster `consumption_destination`.
+
+## Troubleshooting
+
+### `UnsupportedProductError` ou cliente recusa a conexão
+
+A versão do cliente `elasticsearch-py` não está alinhada com o servidor. Veja a [tabela de compatibilidade de versões](#compatibilidade-de-versões-do-elasticsearch) acima e ajuste o `requirements.txt` para a linha apropriada (8.x ou 9.x) antes de reinstalar as dependências.
+
+### `KeyError: 'after_key'` nos logs
+
+Atualize para a versão mais recente do framework — esse era um bug de paginação corrigido para ES 8.17+.
+
+### Sem dados nos dashboards após a execução
+
+1. Execute `python main.py diagnose --config-file config.yml` para verificar a disponibilidade dos dados.
+2. Confirme que o `init` foi executado no cluster de destino.
+3. Verifique se os índices de monitoramento (`.monitoring-es-7-*`, `.monitoring-es-8-*` ou `.monitoring-es-9-*`) existem no cluster de origem.
+4. Re-execute com `--debug` para ver logs detalhados das queries.
+5. Verifique as permissões da API key em ambos os clusters.
+
+### O script roda mas produz 0 documentos
+
+- Execute `diagnose` para verificar quais dados de monitoramento estão disponíveis.
+- Se existem dados V7 mas não V8/V9, garanta que `monitoring_index_pattern` esteja configurado para `.monitoring*` ou `.monitoring-es-7-*`.
+- A API key de origem pode estar sem `read` em `.monitoring-es-*`.
+- Re-execute com `--force` se os dados existem mas já foram processados anteriormente.
+
+### Custos aparecem como 0
+
+- Se estiver usando `aws_cost_explorer`: cheque as credenciais AWS e as permissões IAM.
+- Se estiver usando `on_prem_costs`: confirme que os valores estão definidos no `config.yml`.
+- Re-execute com `--debug` e procure por mensagens de log "AWS Cost Explorer" ou "cost".
+
+### Erros de SSL / certificado
+
+Adicione `verify_certs: false` em `monitoring_source` ou `consumption_destination` no seu config (não recomendado para produção). Como alternativa mais segura, forneça `ca_certs: /path/to/ca.pem`.
+
+### Executando atrás de proxy
+
+Defina as variáveis de ambiente `HTTP_PROXY` / `HTTPS_PROXY` — o framework as detecta automaticamente:
+
+```bash
+export HTTPS_PROXY=http://proxy.example.com:8080
+python main.py consume-monitoring --config-file config.yml
+```
+
+Para Docker:
+
+```bash
+docker run --rm \
+  -e HTTPS_PROXY=http://proxy.example.com:8080 \
+  -v "$(pwd)/config.yml:/config.yml" \
+  consumption-framework:latest \
+  consume-monitoring --config-file /config.yml
+```
